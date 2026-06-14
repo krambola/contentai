@@ -101,8 +101,8 @@ export async function gerarVariacoesArte(
 
   const urls: string[] = [];
   for (const r of resultados) {
-    if (r.status === 'fulfilled' && r.value.data[0]?.url) {
-      urls.push(r.value.data[0].url);
+    if (r.status === 'fulfilled' && r.value.data?.[0]?.url) {
+      urls.push(r.value.data[0]!.url);
     }
   }
 
