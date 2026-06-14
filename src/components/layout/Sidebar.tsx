@@ -6,7 +6,7 @@ import {
   LayoutDashboard,
   Users,
   Package,
-  ChartBar,
+  BarChart2,
   Calendar,
   Lightbulb,
   Video,
@@ -33,7 +33,7 @@ const nav = [
   {
     label: 'Conteúdo',
     items: [
-      { href: '/analise', icon: ChartBar, label: 'Análise IA' },
+      { href: '/analise', icon: BarChart2, label: 'Análise IA' },
       { href: '/calendario', icon: Calendar, label: 'Calendário' },
       { href: '/ideias', icon: Lightbulb, label: 'Gerador de Ideias' },
       { href: '/roteiros', icon: Video, label: 'Roteiros' },
