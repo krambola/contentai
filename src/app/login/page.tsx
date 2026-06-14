@@ -7,6 +7,30 @@ import { useAuth } from '@/lib/auth/AuthContext';
 import Button from '@/components/ui/Button';
 import toast from 'react-hot-toast';
 
+function getAuthErrorMessage(error: unknown): string {
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error
+      ? String((error as { code?: unknown }).code)
+      : '';
+
+  switch (code) {
+    case 'auth/invalid-api-key':
+      return 'Firebase API Key invalida ou ausente.';
+    case 'auth/unauthorized-domain':
+      return 'Dominio nao autorizado no Firebase Authentication.';
+    case 'auth/operation-not-allowed':
+      return 'Metodo de login nao ativado no Firebase.';
+    case 'auth/popup-closed-by-user':
+      return 'Login com Google cancelado.';
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return 'E-mail ou senha incorretos.';
+    default:
+      return code ? `Erro no login: ${code}` : 'Nao foi possivel fazer login.';
+  }
+}
+
 export default function LoginPage() {
   const { signIn, signInWithGoogle, resetPassword } = useAuth();
   const router = useRouter();
@@ -22,8 +46,8 @@ export default function LoginPage() {
     try {
       await signIn(email, password);
       router.push('/dashboard');
-    } catch {
-      toast.error('E-mail ou senha incorretos.');
+    } catch (error) {
+      toast.error(getAuthErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -34,8 +58,8 @@ export default function LoginPage() {
     try {
       await signInWithGoogle();
       router.push('/dashboard');
-    } catch {
-      toast.error('Erro ao entrar com Google.');
+    } catch (error) {
+      toast.error(getAuthErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -48,8 +72,8 @@ export default function LoginPage() {
       await resetPassword(email);
       toast.success('E-mail de redefinição enviado!');
       setMode('login');
-    } catch {
-      toast.error('E-mail não encontrado.');
+    } catch (error) {
+      toast.error(getAuthErrorMessage(error));
     } finally {
       setLoading(false);
     }
