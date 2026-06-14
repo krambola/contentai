@@ -11,7 +11,7 @@ import {
   signInWithPopup,
   type User,
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase/config';
+import { getFirebaseAuth } from '@/lib/firebase/config';
 
 interface AuthContextValue {
   user: User | null;
@@ -30,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const auth = getFirebaseAuth();
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setLoading(false);
@@ -38,23 +39,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function signIn(email: string, password: string) {
+    const auth = getFirebaseAuth();
     await signInWithEmailAndPassword(auth, email, password);
   }
 
   async function signUp(email: string, password: string) {
+    const auth = getFirebaseAuth();
     await createUserWithEmailAndPassword(auth, email, password);
   }
 
   async function signInWithGoogle() {
+    const auth = getFirebaseAuth();
     const provider = new GoogleAuthProvider();
     await signInWithPopup(auth, provider);
   }
 
   async function logout() {
+    const auth = getFirebaseAuth();
     await signOut(auth);
   }
 
   async function resetPassword(email: string) {
+    const auth = getFirebaseAuth();
     await sendPasswordResetEmail(auth, email);
   }
 
