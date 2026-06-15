@@ -409,16 +409,16 @@ export default function ArtesPage() {
                   </select>
                 </div>
 
-                {/* Prompt customizado */}
+                {/* Briefing livre */}
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Direção visual (opcional)
+                    Como voce quer a arte?
                   </label>
                   <textarea
                     value={promptCustom}
                     onChange={(e) => setPromptCustom(e.target.value)}
-                    rows={2}
-                    placeholder="Ex: fundo branco clean, produto centralizado, luz natural..."
+                    rows={3}
+                    placeholder="Ex: quero uma arte premium, com o produto em destaque, fundo claro, sensacao de tecnologia e chamada para contratar..."
                     className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
                   />
                 </div>
@@ -544,7 +544,7 @@ export default function ArtesPage() {
                   loading={gerando}
                 >
                   <Sparkles size={14} />
-                  Gerar 3 variações com IA
+                  Gerar prompt e artes com IA
                 </Button>
               </div>
             </Card>
@@ -629,8 +629,8 @@ export default function ArtesPage() {
           </div>
           <p className="font-semibold text-gray-800">Gerando arte com IA...</p>
           <div className="space-y-1 text-center">
-            <p className="text-sm text-gray-500">1. Claude analisa a marca e cria o prompt visual</p>
-            <p className="text-sm text-gray-500">2. FLUX gera 3 variações de imagem</p>
+            <p className="text-sm text-gray-500">1. A IA transforma seu briefing em prompt visual</p>
+            <p className="text-sm text-gray-500">2. A IA gera 3 variações de imagem</p>
             <p className="text-sm text-gray-400 text-xs">Pode levar até 30 segundos</p>
           </div>
         </div>
