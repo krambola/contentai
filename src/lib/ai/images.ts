@@ -1,6 +1,12 @@
 import OpenAI, { toFile } from 'openai';
 import type { Cliente, Produto, FormatoArte, ReferenciaArte } from '@/types';
 
+export interface TextosArteGerados {
+  titulo: string;
+  subtitulo: string;
+  cta: string;
+}
+
 // ─── DIMENSÕES POR FORMATO ───────────────────────────────────────────────────
 
 export const DIMENSOES_ARTE: Record<FormatoArte, { width: number; height: number; label: string }> = {
@@ -109,6 +115,66 @@ Return ONLY the English prompt.`;
   });
 
   return res.choices[0]?.message?.content?.trim() ?? '';
+}
+export async function gerarTextosArte(
+  cliente: Cliente,
+  produto: Produto | null,
+  objetivo: string,
+  estiloTexto: string,
+  referenciaTexto: string,
+  evitarTexto: string
+): Promise<TextosArteGerados> {
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const res = await client.chat.completions.create({
+    model: 'gpt-4o-mini',
+    response_format: { type: 'json_object' },
+    max_tokens: 220,
+    messages: [
+      {
+        role: 'system',
+        content: 'You write concise Brazilian Portuguese advertising copy for professional social media art. Return valid JSON only.',
+      },
+      {
+        role: 'user',
+        content: `Crie textos curtos para uma arte profissional.
+
+Marca: ${cliente.nome}
+Segmento: ${cliente.segmento}
+Tom de voz da marca: ${cliente.tomDeVoz || 'profissional e claro'}
+Objetivo: ${objetivo}
+Produto: ${produto ? `${produto.nome} - ${produto.descricao}` : 'conteudo institucional'}
+Estilo desejado: ${estiloTexto || 'profissional'}
+Referencia de escrita: ${referenciaTexto || 'sem referencia especifica'}
+Evitar: ${evitarTexto || 'promessas exageradas, texto longo e linguagem generica'}
+
+Regras:
+- titulo: maximo 6 palavras
+- subtitulo: maximo 12 palavras
+- cta: maximo 4 palavras
+- sem hashtags
+- sem emojis
+- linguagem natural, comercial e objetiva
+
+Retorne JSON neste formato:
+{"titulo":"...","subtitulo":"...","cta":"..."}`,
+      },
+    ],
+  });
+
+  try {
+    const parsed = JSON.parse(res.choices[0]?.message?.content ?? '{}') as Partial<TextosArteGerados>;
+    return {
+      titulo: parsed.titulo?.trim() || cliente.nome,
+      subtitulo: parsed.subtitulo?.trim() || (produto?.nome ?? objetivo),
+      cta: parsed.cta?.trim() || 'Saiba mais',
+    };
+  } catch {
+    return {
+      titulo: cliente.nome,
+      subtitulo: produto?.nome ?? objetivo,
+      cta: 'Saiba mais',
+    };
+  }
 }
 // --- GERAÇÃO DE IMAGENS VIA DALL-E 3 ─────────────────────────────────────────
 // DALL-E 3 gera 1 imagem por chamada, então fazemos 3 chamadas em paralelo

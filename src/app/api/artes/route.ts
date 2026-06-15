@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { gerarPromptArte, gerarVariacoesArte } from '@/lib/ai/images';
+import { gerarPromptArte, gerarTextosArte, gerarVariacoesArte } from '@/lib/ai/images';
 import type { Cliente, Produto, FormatoArte, ReferenciaArte } from '@/types';
 
 export async function POST(req: NextRequest) {
   try {
-    const { cliente, produto, formato, objetivo, promptCustom, referencias }: {
+    const { cliente, produto, formato, objetivo, promptCustom, referencias, estiloTexto, referenciaTexto, evitarTexto }: {
       cliente: Cliente;
       produto: Produto | null;
       formato: FormatoArte;
       objetivo: string;
       promptCustom?: string;
       referencias?: ReferenciaArte[];
+      estiloTexto?: string;
+      referenciaTexto?: string;
+      evitarTexto?: string;
     } = await req.json();
     const referenciasProduto: ReferenciaArte[] = (produto?.fotoUrls ?? []).slice(0, 5).map((imageUrl, index) => ({
       id: `produto-${index}`,
@@ -31,9 +34,19 @@ export async function POST(req: NextRequest) {
     );
 
     // 2. FLUX gera 3 variações de imagem
-    const imageUrls = await gerarVariacoesArte(prompt, formato, referenciasFinais);
+    const [imageUrls, textos] = await Promise.all([
+      gerarVariacoesArte(prompt, formato, referenciasFinais),
+      gerarTextosArte(
+        cliente,
+        produto,
+        objetivo,
+        estiloTexto ?? 'profissional',
+        referenciaTexto ?? '',
+        evitarTexto ?? ''
+      ),
+    ]);
 
-    return NextResponse.json({ prompt, imageUrls });
+    return NextResponse.json({ prompt, imageUrls, textos });
   } catch (err) {
     console.error('Erro ao gerar arte:', err);
     return NextResponse.json(

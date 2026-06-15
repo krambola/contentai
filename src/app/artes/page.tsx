@@ -55,6 +55,16 @@ const TIPOS_REFERENCIA: { key: TipoReferenciaArte; label: string }[] = [
   { key: 'inspiracao', label: 'Inspiração geral' },
 ];
 
+const ESTILOS_TEXTO = [
+  { value: 'profissional', label: 'Profissional' },
+  { value: 'premium', label: 'Premium' },
+  { value: 'promocional', label: 'Promocional' },
+  { value: 'direto', label: 'Direto' },
+  { value: 'educativo', label: 'Educativo' },
+  { value: 'urgente', label: 'Urgente' },
+  { value: 'divertido', label: 'Divertido' },
+];
+
 // Escala visual do canvas no editor (para caber na tela)
 function escalaCanvas(formato: FormatoArte): { w: number; h: number; scale: number } {
   const dim = DIMENSOES_ARTE[formato];
@@ -78,6 +88,9 @@ export default function ArtesPage() {
   const [promptCustom, setPromptCustom] = useState('');
   const [referencias, setReferencias] = useState<ReferenciaArte[]>([]);
   const [referenciaFiles, setReferenciaFiles] = useState<Record<string, File>>({});
+  const [estiloTexto, setEstiloTexto] = useState('profissional');
+  const [referenciaTexto, setReferenciaTexto] = useState('');
+  const [evitarTexto, setEvitarTexto] = useState('');
 
   // Geração
   const [promptGerado, setPromptGerado] = useState('');
@@ -175,6 +188,9 @@ export default function ArtesPage() {
           objetivo,
           promptCustom: promptCustom || undefined,
           referencias: referenciasEnviadas,
+          estiloTexto,
+          referenciaTexto: referenciaTexto || undefined,
+          evitarTexto: evitarTexto || undefined,
         }),
       });
       const data = await res.json();
@@ -183,30 +199,40 @@ export default function ArtesPage() {
       setPromptGerado(data.prompt);
       setVariacoes(data.imageUrls);
       setVariacaoSelecionada(0);
+      const textos = data.textos ?? {};
 
-      // Cria layer de texto inicial com nome do cliente
+      // Cria layers editaveis com textos profissionais gerados pela IA.
       setLayers([
         {
           id: crypto.randomUUID(),
-          text: clienteAtivo.nome,
-          x: 20, y: 20,
-          fontSize: 28, fontWeight: 'bold',
-          color: clienteAtivo.coresPrincipais[0] ?? '#FFFFFF',
+          text: textos.titulo ?? clienteAtivo.nome,
+          x: 20, y: 24,
+          fontSize: 34, fontWeight: 'bold',
+          color: '#FFFFFF',
           align: 'left',
-          width: 300,
+          width: 340,
         },
         {
           id: crypto.randomUUID(),
-          text: produto?.nome ?? objetivo,
-          x: 20, y: 60,
+          text: textos.subtitulo ?? (produto?.nome ?? objetivo),
+          x: 20, y: 76,
           fontSize: 18, fontWeight: 'normal',
           color: '#FFFFFF',
           align: 'left',
-          width: 300,
+          width: 330,
+        },
+        {
+          id: crypto.randomUUID(),
+          text: textos.cta ?? 'Saiba mais',
+          x: 20, y: 122,
+          fontSize: 16, fontWeight: 'bold',
+          color: clienteAtivo.coresPrincipais[0] ?? '#FFFFFF',
+          align: 'left',
+          width: 220,
         },
       ]);
       setStep('editor');
-      toast.success('Arte gerada! Personalize os textos abaixo.');
+      toast.success('Arte gerada com textos profissionais.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao gerar arte.');
       setStep('config');
@@ -395,6 +421,49 @@ export default function ArtesPage() {
                     placeholder="Ex: fundo branco clean, produto centralizado, luz natural..."
                     className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
                   />
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                  <p className="mb-3 text-sm font-medium text-gray-700">Texto da arte</p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="mb-1 block text-xs text-gray-500">Estilo de escrita</label>
+                      <select
+                        value={estiloTexto}
+                        onChange={(e) => setEstiloTexto(e.target.value)}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
+                      >
+                        {ESTILOS_TEXTO.map((estilo) => (
+                          <option key={estilo.value} value={estilo.value}>{estilo.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-gray-500">
+                        Referencia de escrita
+                      </label>
+                      <textarea
+                        value={referenciaTexto}
+                        onChange={(e) => setReferenciaTexto(e.target.value)}
+                        rows={2}
+                        placeholder="Ex: chamada curta, objetiva, com tom de especialista..."
+                        className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs text-gray-500">
+                        O que evitar no texto
+                      </label>
+                      <input
+                        value={evitarTexto}
+                        onChange={(e) => setEvitarTexto(e.target.value)}
+                        placeholder="Ex: promessas exageradas, texto longo, girias..."
+                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div>
