@@ -149,13 +149,13 @@ export async function getCalendario(
   const snap = await getDocs(
     query(
       collection(db, 'calendario'),
-      where('clienteId', '==', clienteId),
-      where('mes', '==', mes),
-      where('ano', '==', ano)
+      where('clienteId', '==', clienteId)
     )
   );
   return sortByDate(
-    snap.docs.map((d) => docToObj<ItemCalendario>(d.id, d.data())),
+    snap.docs
+      .map((d) => docToObj<ItemCalendario>(d.id, d.data()))
+      .filter((item) => item.mes === mes && item.ano === ano),
     'data',
     'asc'
   );
@@ -180,13 +180,13 @@ export async function getIdeias(
   clienteId: string,
   produtoId?: string
 ): Promise<Ideia[]> {
-  const constraints = [where('clienteId', '==', clienteId)];
-  if (produtoId) constraints.push(where('produtoId', '==', produtoId));
   const snap = await getDocs(
-    query(collection(db, 'ideias'), ...constraints)
+    query(collection(db, 'ideias'), where('clienteId', '==', clienteId))
   );
   return sortByDate(
-    snap.docs.map((d) => docToObj<Ideia>(d.id, d.data())),
+    snap.docs
+      .map((d) => docToObj<Ideia>(d.id, d.data()))
+      .filter((ideia) => !produtoId || ideia.produtoId === produtoId),
     'geradoEm'
   );
 }
