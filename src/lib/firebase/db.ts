@@ -49,6 +49,14 @@ function docToObj<T>(id: string, data: Record<string, any>): T {
   return result as T;
 }
 
+function sortByDate<T>(items: T[], field: keyof T, direction: 'asc' | 'desc' = 'desc'): T[] {
+  return [...items].sort((a, b) => {
+    const aTime = new Date(String(a[field] ?? '')).getTime() || 0;
+    const bTime = new Date(String(b[field] ?? '')).getTime() || 0;
+    return direction === 'asc' ? aTime - bTime : bTime - aTime;
+  });
+}
+
 // ─── CLIENTES ────────────────────────────────────────────────────────────────
 
 export async function getClientes(): Promise<Cliente[]> {
@@ -93,11 +101,13 @@ export async function getProdutos(clienteId: string): Promise<Produto[]> {
   const snap = await getDocs(
     query(
       collection(db, 'produtos'),
-      where('clienteId', '==', clienteId),
-      orderBy('criadoEm', 'desc')
+      where('clienteId', '==', clienteId)
     )
   );
-  return snap.docs.map((d) => docToObj<Produto>(d.id, d.data()));
+  return sortByDate(
+    snap.docs.map((d) => docToObj<Produto>(d.id, d.data())),
+    'criadoEm'
+  );
 }
 
 export async function getProduto(id: string): Promise<Produto | null> {
@@ -141,11 +151,14 @@ export async function getCalendario(
       collection(db, 'calendario'),
       where('clienteId', '==', clienteId),
       where('mes', '==', mes),
-      where('ano', '==', ano),
-      orderBy('data', 'asc')
+      where('ano', '==', ano)
     )
   );
-  return snap.docs.map((d) => docToObj<ItemCalendario>(d.id, d.data()));
+  return sortByDate(
+    snap.docs.map((d) => docToObj<ItemCalendario>(d.id, d.data())),
+    'data',
+    'asc'
+  );
 }
 
 export async function salvarItensCalendario(
@@ -170,9 +183,12 @@ export async function getIdeias(
   const constraints = [where('clienteId', '==', clienteId)];
   if (produtoId) constraints.push(where('produtoId', '==', produtoId));
   const snap = await getDocs(
-    query(collection(db, 'ideias'), ...constraints, orderBy('geradoEm', 'desc'))
+    query(collection(db, 'ideias'), ...constraints)
   );
-  return snap.docs.map((d) => docToObj<Ideia>(d.id, d.data()));
+  return sortByDate(
+    snap.docs.map((d) => docToObj<Ideia>(d.id, d.data())),
+    'geradoEm'
+  );
 }
 
 export async function salvarIdeias(
@@ -194,11 +210,13 @@ export async function getRoteiros(clienteId: string): Promise<Roteiro[]> {
   const snap = await getDocs(
     query(
       collection(db, 'roteiros'),
-      where('clienteId', '==', clienteId),
-      orderBy('geradoEm', 'desc')
+      where('clienteId', '==', clienteId)
     )
   );
-  return snap.docs.map((d) => docToObj<Roteiro>(d.id, d.data()));
+  return sortByDate(
+    snap.docs.map((d) => docToObj<Roteiro>(d.id, d.data())),
+    'geradoEm'
+  );
 }
 
 export async function salvarRoteiro(
@@ -219,12 +237,14 @@ export async function getUltimaAnalise(
   const snap = await getDocs(
     query(
       collection(db, 'analises'),
-      where('clienteId', '==', clienteId),
-      orderBy('geradoEm', 'desc')
+      where('clienteId', '==', clienteId)
     )
   );
   if (snap.empty) return null;
-  return docToObj<AnaliseNegocio>(snap.docs[0].id, snap.docs[0].data());
+  return sortByDate(
+    snap.docs.map((d) => docToObj<AnaliseNegocio>(d.id, d.data())),
+    'geradoEm'
+  )[0] ?? null;
 }
 
 export async function salvarAnalise(
@@ -243,11 +263,13 @@ export async function getAlertas(clienteId: string): Promise<AlertaRadar[]> {
   const snap = await getDocs(
     query(
       collection(db, 'alertas'),
-      where('clienteId', '==', clienteId),
-      orderBy('geradoEm', 'desc')
+      where('clienteId', '==', clienteId)
     )
   );
-  return snap.docs.map((d) => docToObj<AlertaRadar>(d.id, d.data()));
+  return sortByDate(
+    snap.docs.map((d) => docToObj<AlertaRadar>(d.id, d.data())),
+    'geradoEm'
+  );
 }
 
 export async function salvarAlertas(
@@ -271,11 +293,13 @@ export async function getBiblioteca(
   const snap = await getDocs(
     query(
       collection(db, 'biblioteca'),
-      where('clienteId', '==', clienteId),
-      orderBy('criadoEm', 'desc')
+      where('clienteId', '==', clienteId)
     )
   );
-  return snap.docs.map((d) => docToObj<ConteudoBiblioteca>(d.id, d.data()));
+  return sortByDate(
+    snap.docs.map((d) => docToObj<ConteudoBiblioteca>(d.id, d.data())),
+    'criadoEm'
+  );
 }
 
 export async function salvarNaBiblioteca(
@@ -294,11 +318,13 @@ export async function getArtes(clienteId: string): Promise<Arte[]> {
   const snap = await getDocs(
     query(
       collection(db, 'artes'),
-      where('clienteId', '==', clienteId),
-      orderBy('geradoEm', 'desc')
+      where('clienteId', '==', clienteId)
     )
   );
-  return snap.docs.map((d) => docToObj<Arte>(d.id, d.data()));
+  return sortByDate(
+    snap.docs.map((d) => docToObj<Arte>(d.id, d.data())),
+    'geradoEm'
+  );
 }
 
 export async function salvarArte(arte: Omit<Arte, 'id'>): Promise<string> {
