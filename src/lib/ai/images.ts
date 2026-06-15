@@ -89,7 +89,6 @@ export async function gerarVariacoesArte(
   const size = DALLE_SIZE[formato];
 
   // 3 variações em paralelo com seeds diferentes via style variation
-  const estilos: Array<'vivid' | 'natural'> = ['vivid', 'natural', 'vivid'];
   const seeds = [
     prompt,
     `${prompt}, alternative composition`,
@@ -97,13 +96,12 @@ export async function gerarVariacoesArte(
   ];
 
   const resultados = await Promise.allSettled(
-    seeds.map((p, i) =>
+    seeds.map((p) =>
       client.images.generate({
         model: 'dall-e-3',
         prompt: `${p}. No text, no words, no watermarks in the image.`,
         size,
         quality: 'standard',
-        style: estilos[i],
         n: 1,
       })
     )
