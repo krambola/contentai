@@ -13,11 +13,11 @@ export const DIMENSOES_ARTE: Record<FormatoArte, { width: number; height: number
 // DALL-E 3 suporta apenas esses tamanhos:
 // 1024x1024, 1792x1024, 1024x1792
 // Mapeamos cada formato para o mais próximo
-const DALLE_SIZE: Record<FormatoArte, '1024x1024' | '1792x1024' | '1024x1792'> = {
-  feed_retrato:  '1024x1792', // vertical
+const IMAGE_SIZE: Record<FormatoArte, '1024x1024' | '1536x1024' | '1024x1536'> = {
+  feed_retrato:  '1024x1536', // vertical
   feed_quadrado: '1024x1024', // quadrado
-  story:         '1024x1792', // vertical
-  banner:        '1792x1024', // horizontal
+  story:         '1024x1536', // vertical
+  banner:        '1536x1024', // horizontal
 };
 
 function getOpenAIErrorMessage(error: unknown): string {
@@ -49,11 +49,11 @@ export async function gerarPromptArte(
     messages: [
       {
         role: 'system',
-        content: 'You are an expert at writing DALL-E 3 image generation prompts for advertising photography. Return only the prompt, no explanations.',
+        content: 'You are an expert at writing image generation prompts for advertising photography. Return only the prompt, no explanations.',
       },
       {
         role: 'user',
-        content: `Create a DALL-E 3 prompt for a professional social media advertising photo.
+        content: `Create an image generation prompt for a professional social media advertising photo.
 
 BRAND: ${cliente.nome}
 Segment: ${cliente.segmento}
@@ -86,7 +86,7 @@ export async function gerarVariacoesArte(
   formato: FormatoArte
 ): Promise<string[]> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const size = DALLE_SIZE[formato];
+  const size = IMAGE_SIZE[formato];
 
   // 3 variações em paralelo com seeds diferentes via style variation
   const seeds = [
@@ -98,10 +98,10 @@ export async function gerarVariacoesArte(
   const resultados = await Promise.allSettled(
     seeds.map((p) =>
       client.images.generate({
-        model: 'dall-e-3',
+        model: 'gpt-image-1',
         prompt: `${p}. No text, no words, no watermarks in the image.`,
         size,
-        quality: 'standard',
+        quality: 'medium',
         n: 1,
       })
     )
@@ -111,8 +111,11 @@ export async function gerarVariacoesArte(
   const erros: string[] = [];
   for (const r of resultados) {
     const imageUrl = r.status === 'fulfilled' ? r.value.data?.[0]?.url : undefined;
+    const imageB64 = r.status === 'fulfilled' ? r.value.data?.[0]?.b64_json : undefined;
     if (imageUrl) {
       urls.push(imageUrl);
+    } else if (imageB64) {
+      urls.push(`data:image/png;base64,${imageB64}`);
     } else if (r.status === 'rejected') {
       erros.push(getOpenAIErrorMessage(r.reason));
     }
