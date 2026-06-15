@@ -24,6 +24,13 @@ export async function uploadFotoProduto(
   return uploadArquivo(file, `clientes/${clienteId}/produtos/${produtoId}/fotos`);
 }
 
+export async function uploadReferenciaArte(
+  clienteId: string,
+  file: File
+): Promise<string> {
+  return uploadArquivo(file, `clientes/${clienteId}/referencias-artes`);
+}
+
 export async function deletarArquivo(url: string): Promise<void> {
   const fileRef = ref(storage, url);
   await deleteObject(fileRef);

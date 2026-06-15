@@ -2,11 +2,12 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { X, Plus, Trash2 } from 'lucide-react';
+import { ImagePlus, X, Plus, Trash2 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import { Textarea } from '@/components/ui';
 import { criarProduto, atualizarProduto } from '@/lib/firebase/db';
+import { uploadFotoProduto } from '@/lib/firebase/storage';
 import type { Produto, ProdutoInput } from '@/types';
 import toast from 'react-hot-toast';
 
@@ -23,6 +24,8 @@ export default function ProdutoModal({ produto, clienteId, onClose, onSaved }: P
   const [palavrasChave, setPalavrasChave] = useState<string>(
     produto?.palavrasChave.join(', ') ?? ''
   );
+  const [fotoUrls, setFotoUrls] = useState<string[]>(produto?.fotoUrls ?? []);
+  const [fotoFiles, setFotoFiles] = useState<File[]>([]);
 
   const { register, handleSubmit, formState: { errors } } = useForm<ProdutoInput>({
     defaultValues: produto ?? {
@@ -46,14 +49,31 @@ export default function ProdutoModal({ produto, clienteId, onClose, onSaved }: P
         ...data,
         clienteId,
         beneficios: beneficios.filter(Boolean),
+        fotoUrls,
+        videoUrls: data.videoUrls ?? [],
         palavrasChave: palavrasChave.split(',').map((k) => k.trim()).filter(Boolean),
       };
 
       if (produto) {
-        await atualizarProduto(produto.id, payload);
+        const novasFotos = await Promise.all(
+          fotoFiles.map((file) => uploadFotoProduto(clienteId, produto.id, file))
+        );
+        await atualizarProduto(produto.id, {
+          ...payload,
+          fotoUrls: [...fotoUrls, ...novasFotos].slice(0, 5),
+        });
         toast.success('Produto atualizado!');
       } else {
-        await criarProduto(payload);
+        const produtoId = await criarProduto({ ...payload, fotoUrls: [] });
+        const novasFotos = await Promise.all(
+          fotoFiles.map((file) => uploadFotoProduto(clienteId, produtoId, file))
+        );
+        if (novasFotos.length > 0) {
+          await atualizarProduto(produtoId, {
+            ...payload,
+            fotoUrls: novasFotos.slice(0, 5),
+          });
+        }
         toast.success('Produto cadastrado!');
       }
       onSaved();
@@ -62,6 +82,27 @@ export default function ProdutoModal({ produto, clienteId, onClose, onSaved }: P
     } finally {
       setSaving(false);
     }
+  }
+
+  function adicionarFotos(files: FileList | null) {
+    if (!files) return;
+    const slots = 5 - fotoUrls.length - fotoFiles.length;
+    if (slots <= 0) {
+      toast.error('Limite de 5 fotos por produto.');
+      return;
+    }
+    const selecionadas = Array.from(files)
+      .filter((file) => file.type.startsWith('image/'))
+      .slice(0, slots);
+    setFotoFiles((prev) => [...prev, ...selecionadas]);
+  }
+
+  function removerFotoExistente(url: string) {
+    setFotoUrls((prev) => prev.filter((item) => item !== url));
+  }
+
+  function removerFotoNova(index: number) {
+    setFotoFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
   return (
@@ -93,6 +134,64 @@ export default function ProdutoModal({ produto, clienteId, onClose, onSaved }: P
               {...register('descricao')}
               placeholder="Descreva o produto ou serviço..."
             />
+
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-sm font-medium text-gray-700">Fotos do produto</p>
+                <span className="text-xs text-gray-400">
+                  {fotoUrls.length + fotoFiles.length}/5
+                </span>
+              </div>
+
+              <div className="grid grid-cols-5 gap-2">
+                {fotoUrls.map((url) => (
+                  <div key={url} className="group relative overflow-hidden rounded-lg border border-gray-200">
+                    <img src={url} alt="Foto do produto" className="h-20 w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removerFotoExistente(url)}
+                      className="absolute right-1 top-1 hidden rounded bg-white/90 p-1 text-red-500 shadow-sm group-hover:block"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+
+                {fotoFiles.map((file, index) => (
+                  <div key={`${file.name}-${index}`} className="group relative overflow-hidden rounded-lg border border-gray-200">
+                    <img
+                      src={URL.createObjectURL(file)}
+                      alt="Nova foto do produto"
+                      className="h-20 w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removerFotoNova(index)}
+                      className="absolute right-1 top-1 hidden rounded bg-white/90 p-1 text-red-500 shadow-sm group-hover:block"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+
+                {fotoUrls.length + fotoFiles.length < 5 && (
+                  <label className="flex h-20 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-gray-200 text-gray-400 hover:border-brand-300 hover:text-brand-600">
+                    <ImagePlus size={16} />
+                    <span className="mt-1 text-[11px]">Adicionar</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        adicionarFotos(e.target.files);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
 
             {/* Benefícios */}
             <div>

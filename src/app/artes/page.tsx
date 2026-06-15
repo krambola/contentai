@@ -10,8 +10,9 @@ import { Card, LoadingSpinner, EmptyState, Select } from '@/components/ui';
 import Button from '@/components/ui/Button';
 import { useAppStore } from '@/lib/store';
 import { getProdutos, getArtes, salvarArte, salvarNaBiblioteca } from '@/lib/firebase/db';
+import { uploadReferenciaArte } from '@/lib/firebase/storage';
 import { DIMENSOES_ARTE } from '@/lib/ai/images';
-import type { Produto, Arte, FormatoArte } from '@/types';
+import type { Produto, Arte, FormatoArte, ReferenciaArte, TipoReferenciaArte } from '@/types';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
@@ -46,6 +47,14 @@ const OBJETIVOS = [
   'Dica / Conteúdo educativo',
 ];
 
+const TIPOS_REFERENCIA: { key: TipoReferenciaArte; label: string }[] = [
+  { key: 'produto', label: 'Produto' },
+  { key: 'estilo', label: 'Estilo visual' },
+  { key: 'paleta', label: 'Paleta/identidade' },
+  { key: 'composicao', label: 'Composição' },
+  { key: 'inspiracao', label: 'Inspiração geral' },
+];
+
 // Escala visual do canvas no editor (para caber na tela)
 function escalaCanvas(formato: FormatoArte): { w: number; h: number; scale: number } {
   const dim = DIMENSOES_ARTE[formato];
@@ -67,6 +76,8 @@ export default function ArtesPage() {
   const [produtoId, setProdutoId] = useState('');
   const [objetivo, setObjetivo] = useState(OBJETIVOS[0]);
   const [promptCustom, setPromptCustom] = useState('');
+  const [referencias, setReferencias] = useState<ReferenciaArte[]>([]);
+  const [referenciaFiles, setReferenciaFiles] = useState<Record<string, File>>({});
 
   // Geração
   const [promptGerado, setPromptGerado] = useState('');
@@ -102,6 +113,42 @@ export default function ArtesPage() {
     load();
   }, [clienteAtivo]);
 
+  function adicionarReferencia(file: File) {
+    if (referencias.length >= 4) {
+      toast.error('Limite de 4 referências por arte.');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      toast.error('Selecione uma imagem válida.');
+      return;
+    }
+    const id = crypto.randomUUID();
+    setReferencias((prev) => [
+      ...prev,
+      {
+        id,
+        tipo: 'inspiracao',
+        imageUrl: URL.createObjectURL(file),
+        seguir: '',
+        evitar: '',
+      },
+    ]);
+    setReferenciaFiles((prev) => ({ ...prev, [id]: file }));
+  }
+
+  function atualizarReferencia(id: string, changes: Partial<ReferenciaArte>) {
+    setReferencias((prev) => prev.map((ref) => ref.id === id ? { ...ref, ...changes } : ref));
+  }
+
+  function removerReferencia(id: string) {
+    setReferencias((prev) => prev.filter((ref) => ref.id !== id));
+    setReferenciaFiles((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }
+
   // ─── GERAÇÃO DE IMAGEM ───────────────────────────────────────────────────────
 
   async function gerarArte() {
@@ -110,6 +157,14 @@ export default function ArtesPage() {
     setStep('gerando');
     try {
       const produto = produtos.find((p) => p.id === produtoId) ?? null;
+      const referenciasEnviadas = await Promise.all(
+        referencias.map(async (ref) => {
+          const file = referenciaFiles[ref.id];
+          if (!file) return ref;
+          const imageUrl = await uploadReferenciaArte(clienteAtivo.id, file);
+          return { ...ref, imageUrl };
+        })
+      );
       const res = await fetch('/api/artes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -119,6 +174,7 @@ export default function ArtesPage() {
           formato,
           objetivo,
           promptCustom: promptCustom || undefined,
+          referencias: referenciasEnviadas,
         }),
       });
       const data = await res.json();
@@ -339,6 +395,77 @@ export default function ArtesPage() {
                     placeholder="Ex: fundo branco clean, produto centralizado, luz natural..."
                     className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none"
                   />
+                </div>
+
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-sm font-medium text-gray-700">Referências visuais</p>
+                    <span className="text-xs text-gray-400">{referencias.length}/4</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {referencias.map((ref) => (
+                      <div key={ref.id} className="rounded-xl border border-gray-200 p-3">
+                        <div className="mb-3 flex gap-3">
+                          <img
+                            src={ref.imageUrl}
+                            alt="Referência visual"
+                            className="h-20 w-20 rounded-lg object-cover"
+                          />
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <select
+                              value={ref.tipo}
+                              onChange={(e) => atualizarReferencia(ref.id, { tipo: e.target.value as TipoReferenciaArte })}
+                              className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs focus:border-brand-600 focus:outline-none"
+                            >
+                              {TIPOS_REFERENCIA.map((tipo) => (
+                                <option key={tipo.key} value={tipo.key}>{tipo.label}</option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => removerReferencia(ref.id)}
+                              className="text-xs text-red-500 hover:underline"
+                            >
+                              Remover referência
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            value={ref.seguir}
+                            onChange={(e) => atualizarReferencia(ref.id, { seguir: e.target.value })}
+                            placeholder="O que seguir?"
+                            className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs focus:border-brand-600 focus:outline-none"
+                          />
+                          <input
+                            value={ref.evitar}
+                            onChange={(e) => atualizarReferencia(ref.id, { evitar: e.target.value })}
+                            placeholder="O que evitar copiar?"
+                            className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs focus:border-brand-600 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    ))}
+
+                    {referencias.length < 4 && (
+                      <label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-gray-200 px-3 py-3 text-sm text-gray-500 hover:border-brand-300 hover:text-brand-600">
+                        <Plus size={14} className="mr-2" />
+                        Adicionar imagem de referência
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) adicionarReferencia(file);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
                 </div>
 
                 <Button

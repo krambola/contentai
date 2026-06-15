@@ -153,6 +153,15 @@ export interface ConteudoBiblioteca {
 // ─── ARTE ────────────────────────────────────────────────────────────────────
 
 export type FormatoArte = 'feed_retrato' | 'feed_quadrado' | 'story' | 'banner';
+export type TipoReferenciaArte = 'produto' | 'estilo' | 'paleta' | 'composicao' | 'inspiracao';
+
+export interface ReferenciaArte {
+  id: string;
+  tipo: TipoReferenciaArte;
+  imageUrl: string;
+  seguir: string;
+  evitar: string;
+}
 
 export interface Arte {
   id: string;

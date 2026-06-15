@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import type { Cliente, Produto, FormatoArte } from '@/types';
+import type { Cliente, Produto, FormatoArte, ReferenciaArte } from '@/types';
 
 // ─── DIMENSÕES POR FORMATO ───────────────────────────────────────────────────
 
@@ -36,12 +36,51 @@ export async function gerarPromptArte(
   cliente: Cliente,
   produto: Produto | null,
   formato: FormatoArte,
-  objetivo: string
+  objetivo: string,
+  promptCustom = '',
+  referencias: ReferenciaArte[] = []
 ): Promise<string> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const dim = DIMENSOES_ARTE[formato];
   const coresPrincipais = cliente.coresPrincipais.slice(0, 3).join(', ') || 'neutral elegant colors';
   const coresSecundarias = cliente.coresSecundarias.slice(0, 2).join(', ') || '';
+  const referenciasTexto = referencias.length > 0
+    ? referencias.map((ref, index) => (
+        `Reference ${index + 1} (${ref.tipo}): follow "${ref.seguir || 'the relevant visual qualities'}"; avoid "${ref.evitar || 'direct copying'}".`
+      )).join('\n')
+    : 'No reference images provided.';
+  const promptTexto = `Create an image generation prompt for a professional social media advertising photo.
+
+BRAND: ${cliente.nome}
+Segment: ${cliente.segmento}
+Brand colors: ${coresPrincipais}${coresSecundarias ? `, ${coresSecundarias}` : ''}
+${produto ? `PRODUCT: ${produto.nome} - ${produto.descricao}` : 'Brand institutional content'}
+${produto?.fotoUrls?.length ? `Product photo URLs for context: ${produto.fotoUrls.slice(0, 5).join(', ')}` : ''}
+GOAL: ${objetivo}
+FORMAT: ${dim.label}
+VISUAL DIRECTION: ${promptCustom || 'Use the brand identity and campaign goal.'}
+REFERENCES:
+${referenciasTexto}
+
+Rules:
+- Describe visual composition, lighting, photographic style
+- Reference brand colors naturally in the scene
+- Product should look appetizing/attractive if present
+- Use references as inspiration only; do not copy layouts or protected artwork directly
+- Style: advertising photography, commercial, professional, high-end
+- No text or words in the image
+- Max 120 words
+
+Return ONLY the English prompt.`;
+  const userContent = referencias.length > 0
+    ? [
+        { type: 'text' as const, text: promptTexto },
+        ...referencias.map((ref) => ({
+          type: 'image_url' as const,
+          image_url: { url: ref.imageUrl },
+        })),
+      ]
+    : promptTexto;
 
   const res = await client.chat.completions.create({
     model: 'gpt-4o-mini',
@@ -53,32 +92,14 @@ export async function gerarPromptArte(
       },
       {
         role: 'user',
-        content: `Create an image generation prompt for a professional social media advertising photo.
-
-BRAND: ${cliente.nome}
-Segment: ${cliente.segmento}
-Brand colors: ${coresPrincipais}${coresSecundarias ? `, ${coresSecundarias}` : ''}
-${produto ? `PRODUCT: ${produto.nome} — ${produto.descricao}` : 'Brand institutional content'}
-GOAL: ${objetivo}
-FORMAT: ${dim.label}
-
-Rules:
-- Describe visual composition, lighting, photographic style
-- Reference brand colors naturally in the scene
-- Product should look appetizing/attractive if present
-- Style: advertising photography, commercial, professional, high-end
-- No text or words in the image
-- Max 120 words
-
-Return ONLY the English prompt.`,
+        content: userContent,
       },
     ],
   });
 
   return res.choices[0]?.message?.content?.trim() ?? '';
 }
-
-// ─── GERAÇÃO DE IMAGENS VIA DALL-E 3 ─────────────────────────────────────────
+// --- GERAÇÃO DE IMAGENS VIA DALL-E 3 ─────────────────────────────────────────
 // DALL-E 3 gera 1 imagem por chamada, então fazemos 3 chamadas em paralelo
 
 export async function gerarVariacoesArte(
