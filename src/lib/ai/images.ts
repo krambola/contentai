@@ -20,6 +20,16 @@ const DALLE_SIZE: Record<FormatoArte, '1024x1024' | '1792x1024' | '1024x1792'> =
   banner:        '1792x1024', // horizontal
 };
 
+function getOpenAIErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null) {
+    const maybeError = error as { message?: unknown; error?: { message?: unknown } };
+    if (typeof maybeError.message === 'string') return maybeError.message;
+    if (typeof maybeError.error?.message === 'string') return maybeError.error.message;
+  }
+  return 'Erro desconhecido da OpenAI.';
+}
+
 // ─── GERADOR DE PROMPT VIA GPT ───────────────────────────────────────────────
 
 export async function gerarPromptArte(
@@ -100,15 +110,19 @@ export async function gerarVariacoesArte(
   );
 
   const urls: string[] = [];
+  const erros: string[] = [];
   for (const r of resultados) {
     const imageUrl = r.status === 'fulfilled' ? r.value.data?.[0]?.url : undefined;
     if (imageUrl) {
       urls.push(imageUrl);
+    } else if (r.status === 'rejected') {
+      erros.push(getOpenAIErrorMessage(r.reason));
     }
   }
 
   if (urls.length === 0) {
-    throw new Error('Nenhuma imagem foi gerada. Verifique seus créditos na OpenAI.');
+    const detalhe = erros[0] ? ` Detalhe: ${erros[0]}` : '';
+    throw new Error(`Nenhuma imagem foi gerada pela OpenAI.${detalhe}`);
   }
 
   return urls;
