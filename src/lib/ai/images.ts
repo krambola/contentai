@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import OpenAI, { toFile } from 'openai';
 import type { Cliente, Produto, FormatoArte, ReferenciaArte } from '@/types';
 
 // ─── DIMENSÕES POR FORMATO ───────────────────────────────────────────────────
@@ -28,6 +28,17 @@ function getOpenAIErrorMessage(error: unknown): string {
     if (typeof maybeError.error?.message === 'string') return maybeError.error.message;
   }
   return 'Erro desconhecido da OpenAI.';
+}
+
+async function imageUrlToFile(url: string, index: number) {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Nao foi possivel carregar a imagem de referencia ${index + 1}.`);
+  }
+  const contentType = res.headers.get('content-type') ?? 'image/png';
+  const ext = contentType.includes('jpeg') ? 'jpg' : contentType.includes('webp') ? 'webp' : 'png';
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  return toFile(bytes, `referencia-${index + 1}.${ext}`, { type: contentType });
 }
 
 // ─── GERADOR DE PROMPT VIA GPT ───────────────────────────────────────────────
@@ -104,27 +115,43 @@ Return ONLY the English prompt.`;
 
 export async function gerarVariacoesArte(
   prompt: string,
-  formato: FormatoArte
+  formato: FormatoArte,
+  referencias: ReferenciaArte[] = []
 ): Promise<string[]> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const size = IMAGE_SIZE[formato];
+  const referenceFiles = await Promise.all(
+    referencias
+      .map((ref) => ref.imageUrl)
+      .filter(Boolean)
+      .slice(0, 8)
+      .map((url, index) => imageUrlToFile(url, index))
+  );
 
-  // 3 variações em paralelo com seeds diferentes via style variation
   const seeds = [
-    prompt,
-    `${prompt}, alternative composition`,
-    `${prompt}, different angle`,
+    `${prompt}. Preserve the real product and key visual traits from the provided reference images. Do not invent a different product.`,
+    `${prompt}, alternative composition. Preserve the real product and key visual traits from the provided reference images. Do not invent a different product.`,
+    `${prompt}, different angle. Preserve the real product and key visual traits from the provided reference images. Do not invent a different product.`,
   ];
 
   const resultados = await Promise.allSettled(
     seeds.map((p) =>
-      client.images.generate({
-        model: 'gpt-image-1',
-        prompt: `${p}. No text, no words, no watermarks in the image.`,
-        size,
-        quality: 'medium',
-        n: 1,
-      })
+      referenceFiles.length > 0
+        ? client.images.edit({
+            model: 'gpt-image-1',
+            image: referenceFiles,
+            prompt: `${p}. Use the input images as visual references only. No text, no words, no watermarks in the image.`,
+            size,
+            quality: 'medium',
+            n: 1,
+          })
+        : client.images.generate({
+            model: 'gpt-image-1',
+            prompt: `${p}. No text, no words, no watermarks in the image.`,
+            size,
+            quality: 'medium',
+            n: 1,
+          })
     )
   );
 

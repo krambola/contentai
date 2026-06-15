@@ -12,6 +12,14 @@ export async function POST(req: NextRequest) {
       promptCustom?: string;
       referencias?: ReferenciaArte[];
     } = await req.json();
+    const referenciasProduto: ReferenciaArte[] = (produto?.fotoUrls ?? []).slice(0, 5).map((imageUrl, index) => ({
+      id: `produto-${index}`,
+      tipo: 'produto',
+      imageUrl,
+      seguir: 'preserve the real product shape, color, packaging, texture, and proportions',
+      evitar: 'do not replace it with another product or invent different packaging',
+    }));
+    const referenciasFinais = [...referenciasProduto, ...(referencias ?? [])].slice(0, 8);
 
     const prompt = await gerarPromptArte(
       cliente,
@@ -19,11 +27,11 @@ export async function POST(req: NextRequest) {
       formato,
       objetivo,
       promptCustom,
-      referencias ?? []
+      referenciasFinais
     );
 
     // 2. FLUX gera 3 variações de imagem
-    const imageUrls = await gerarVariacoesArte(prompt, formato);
+    const imageUrls = await gerarVariacoesArte(prompt, formato, referenciasFinais);
 
     return NextResponse.json({ prompt, imageUrls });
   } catch (err) {
